@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>拖放上传示例</title>
+    <style>
+      body,
+      html {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+        user-select: none;
+      }
+      #drop-area {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px dashed #ccc;
+        margin: 20px;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      h2 {
+        text-align: center;
+      }
+      .highlight {
+        background-color: #46a4f1a6;
+      }
+      #file-input {
+        width: 150px;
+      }
+      p {
+        text-align: center;
+      }
+      footer {
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>ADIF to XLSX for HAM</h2>
+    <div id="drop-area">
+      <p>将文件拖放到这里上传 或者 <input type="file" id="file-input" /></p>
+    </div>
+    <footer>Made widh ❤️ by MiniKano</footer>
+    <script>
+      const dropArea = document.getElementById("drop-area");
+      const fileInput = document.getElementById("file-input");
+
+      // 阻止浏览器默认的文件拖放行为
+      dropArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropArea.classList.add("highlight");
+      });
+
+      dropArea.addEventListener("dragleave", () => {
+        dropArea.classList.remove("highlight");
+      });
+
+      dropArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropArea.classList.remove("highlight");
+
+        const file = e.dataTransfer.files[0]; // 获取拖放的第一个文件
+
+        console.log(file.type);
+        if (file) {
+          uploadFile(file);
+        }
+      });
+
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0]; // 获取通过文件输入字段选择的文件
+
+        if (file) {
+          uploadFile(file);
+        }
+      });
+
+      function uploadFile(file) {
+        const formData = new FormData();
+        formData.append("files", file);
+
+        fetch("/adif/upload", {
+          method: "POST",
+          body: formData,
+        })
+          .then((res) => {
+            if (res && res.ok) {
+              if (
+                res.headers.get("Content-Type").includes("application/json")
+              ) {
+                res.json().then((res) => {
+                  alert(res.message);
+                });
+                return; 
+              }
+              const fileName = decodeURIComponent(
+                res.headers
+                  .get("Content-Disposition")
+                  .replace("attachment; filename=", "")
+              );
+              res.blob().then((blob) => {
+                if (window.navigator.msSaveOrOpenBlob) {
+                  navigator.msSaveBlob(blob, fileName); //IE10
+                } else {
+                  let a = document.createElement("a");
+                  document.body.appendChild(a); //兼容火狐，将a标签添加到body当中
+                  let url = window.URL.createObjectURL(blob); // 获取 blob 本地文件连接 (blob 为纯二进制对象，不能够直接保存到磁盘上)
+                  a.href = url;
+                  a.download = fileName;
+                  a.target = "_blank"; // a标签增加target属性
+                  a.click();
+                  a.remove(); //移除a标签
+                  window.URL.revokeObjectURL(url);
+                }
+              });
+            } else {
+              throw new Error(res.message);
+            }
+          })
+          .catch((error) => {
+            console.error("上传失败", error);
+            alert("上传失败");
+          });
+      }
+    </script>
+  </body>
+</html>
